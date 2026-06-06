@@ -15,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Zap, Loader2, ArrowLeft, CheckCircle } from "lucide-react";
+import { Loader2, ArrowLeft, CheckCircle, Mail } from "lucide-react";
 import { resetPassword } from "@/lib/auth/actions";
 import { toast } from "sonner";
 
@@ -54,29 +54,33 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <Card className="w-full max-w-md shadow-lg">
-      <CardHeader className="text-center space-y-2">
-        <div className="flex justify-center mb-2">
-          <div className="flex items-center gap-2">
-            <Zap className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold">TugasKilat</span>
-          </div>
-        </div>
-        <CardTitle className="text-xl">Lupa Password</CardTitle>
-        <CardDescription>
-          Masukkan email untuk menerima link reset password
+    <Card className="border-0 shadow-xl shadow-black/5 dark:shadow-black/20">
+      <CardHeader className="text-center space-y-1.5 pb-4">
+        <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
+        <CardDescription className="text-sm">
+          {sent
+            ? "Cek email kamu untuk link reset"
+            : "Masukkan email untuk menerima link reset password"}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         {sent ? (
-          <div className="text-center space-y-4 py-4">
-            <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
-            <p className="text-sm text-muted-foreground">
-              Link reset password sudah dikirim ke email kamu. Cek inbox atau
-              folder spam.
-            </p>
+          <div className="text-center space-y-5 py-4">
+            <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-green-500/10 mx-auto">
+              <CheckCircle className="h-8 w-8 text-green-500" />
+            </div>
+            <div className="space-y-2">
+              <p className="font-medium">Email terkirim!</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Link reset password sudah dikirim. Cek inbox atau folder spam kamu.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-muted/50">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Cek email kamu</span>
+            </div>
             <Link href="/login">
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-2 font-medium">
                 <ArrowLeft className="h-4 w-4" />
                 Kembali ke Login
               </Button>
@@ -86,32 +90,31 @@ export default function ForgotPasswordPage() {
           <>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-sm font-medium">Email</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="nama@email.com"
+                  className="h-11"
                   {...register("email")}
                 />
                 {errors.email && (
-                  <p className="text-sm text-destructive">
-                    {errors.email.message}
-                  </p>
+                  <p className="text-xs text-destructive mt-1">{errors.email.message}</p>
                 )}
               </div>
 
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full h-11 font-semibold shadow-md shadow-primary/20" disabled={loading}>
                 {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 Kirim Link Reset
               </Button>
             </form>
 
-            <p className="text-center text-sm text-muted-foreground">
+            <p className="text-center">
               <Link
                 href="/login"
-                className="text-primary hover:underline font-medium inline-flex items-center gap-1"
+                className="text-sm text-primary hover:text-primary/80 font-medium inline-flex items-center gap-1.5 transition-colors"
               >
-                <ArrowLeft className="h-3 w-3" />
+                <ArrowLeft className="h-3.5 w-3.5" />
                 Kembali ke Login
               </Link>
             </p>
