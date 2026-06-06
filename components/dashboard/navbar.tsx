@@ -26,6 +26,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { signOut } from "@/lib/auth/actions";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -85,6 +86,9 @@ export function AppNavbar() {
             <span className="text-muted-foreground text-xs font-medium">kredit</span>
           </Badge>
         </Link>
+
+        {/* Theme toggle */}
+        <ThemeToggle />
 
         {/* User menu - desktop */}
         <DropdownMenu>

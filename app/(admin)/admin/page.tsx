@@ -11,6 +11,8 @@ interface Stats {
   totalTasks: number;
   totalCreditsUsed: number;
   totalRevenue: number;
+  totalLlmCost: number;
+  totalTokens: number;
 }
 
 export default function AdminOverviewPage() {
@@ -19,16 +21,19 @@ export default function AdminOverviewPage() {
     totalTasks: 0,
     totalCreditsUsed: 0,
     totalRevenue: 0,
+    totalLlmCost: 0,
+    totalTokens: 0,
   });
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
   useEffect(() => {
     async function fetchStats() {
-      const [usersRes, tasksRes, paymentsRes] = await Promise.all([
+      const [usersRes, tasksRes, paymentsRes, llmRes] = await Promise.all([
         supabase.from("profiles").select("id", { count: "exact", head: true }),
         supabase.from("tasks").select("id, credits_used", { count: "exact" }),
         supabase.from("payments").select("amount_idr").eq("status", "paid"),
+        supabase.from("llm_usage").select("cost_usd, total_tokens"),
       ]);
 
       const totalCreditsUsed = tasksRes.data?.reduce(
@@ -39,11 +44,21 @@ export default function AdminOverviewPage() {
         (acc, p) => acc + (p.amount_idr || 0), 0
       ) || 0;
 
+      const totalLlmCost = llmRes.data?.reduce(
+        (acc, l) => acc + (Number(l.cost_usd) || 0), 0
+      ) || 0;
+
+      const totalTokens = llmRes.data?.reduce(
+        (acc, l) => acc + (l.total_tokens || 0), 0
+      ) || 0;
+
       setStats({
         totalUsers: usersRes.count || 0,
         totalTasks: tasksRes.count || 0,
         totalCreditsUsed,
         totalRevenue,
+        totalLlmCost,
+        totalTokens,
       });
       setLoading(false);
     }
@@ -81,6 +96,20 @@ export default function AdminOverviewPage() {
       color: "text-blue-600 dark:text-blue-400",
       bg: "bg-blue-500/10",
     },
+    {
+      label: "LLM Cost (USD)",
+      value: `$${stats.totalLlmCost.toFixed(4)}`,
+      icon: TrendingUp,
+      color: "text-rose-600 dark:text-rose-400",
+      bg: "bg-rose-500/10",
+    },
+    {
+      label: "Total Tokens",
+      value: stats.totalTokens.toLocaleString(),
+      icon: FileText,
+      color: "text-violet-600 dark:text-violet-400",
+      bg: "bg-violet-500/10",
+    },
   ];
 
   return (
@@ -90,7 +119,7 @@ export default function AdminOverviewPage() {
         <p className="text-muted-foreground mt-1">Overview statistik TugasKilat</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {statCards.map((stat, i) => (
           <motion.div
             key={stat.label}
