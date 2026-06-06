@@ -7,22 +7,49 @@ import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-import { Plus, Trash2, Save, Loader2, CreditCard } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Plus,
+  Trash2,
+  Save,
+  Loader2,
+  CreditCard,
+  Pencil,
+  ToggleLeft,
+  ToggleRight,
+  Coins,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import type { CreditPackage } from "@/lib/types";
 
+const emptyPackage: Omit<CreditPackage, "id" | "created_at"> = {
+  name: "",
+  credits: 0,
+  price_idr: 0,
+  bonus_credits: 0,
+  is_active: true,
+};
+
 export default function AdminPricingPage() {
   const supabase = createClient();
   const [packages, setPackages] = useState<CreditPackage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingPkg, setEditingPkg] = useState<CreditPackage | (typeof emptyPackage & { id?: string }) | null>(null);
+  const [isNew, setIsNew] = useState(false);
 
   useEffect(() => {
     fetchPackages();
@@ -39,53 +66,57 @@ export default function AdminPricingPage() {
     setLoading(false);
   }
 
-  async function handleSave(pkg: CreditPackage) {
-    setSaving(pkg.id);
-    try {
-      if (pkg.id.startsWith("new-")) {
-        const { data, error } = await supabase
-          .from("credit_packages")
-          .insert({
-            name: pkg.name,
-            credits: pkg.credits,
-            price_idr: pkg.price_idr,
-            bonus_credits: pkg.bonus_credits,
-            is_active: pkg.is_active,
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-        setPackages((prev) => prev.map((p) => (p.id === pkg.id ? data : p)));
-        toast.success("Paket berhasil dibuat!");
-      } else {
-        const { error } = await supabase
-          .from("credit_packages")
-          .update({
-            name: pkg.name,
-            credits: pkg.credits,
-            price_idr: pkg.price_idr,
-            bonus_credits: pkg.bonus_credits,
-            is_active: pkg.is_active,
-          })
-          .eq("id", pkg.id);
-
-        if (error) throw error;
-        toast.success("Paket berhasil diupdate!");
-      }
-    } catch {
-      toast.error("Gagal menyimpan paket");
-    }
-    setSaving(null);
+  function openCreate() {
+    setEditingPkg({ ...emptyPackage });
+    setIsNew(true);
+    setDialogOpen(true);
   }
 
-  async function handleDelete(id: string) {
-    if (id.startsWith("new-")) {
-      setPackages((prev) => prev.filter((p) => p.id !== id));
+  function openEdit(pkg: CreditPackage) {
+    setEditingPkg({ ...pkg });
+    setIsNew(false);
+    setDialogOpen(true);
+  }
+
+  async function handleSave() {
+    if (!editingPkg || !editingPkg.name) {
+      toast.error("Nama paket wajib diisi");
       return;
     }
 
-    if (!confirm("Yakin ingin menghapus paket ini?")) return;
+    setSaving(true);
+    try {
+      const payload = {
+        name: editingPkg.name,
+        credits: editingPkg.credits,
+        price_idr: editingPkg.price_idr,
+        bonus_credits: editingPkg.bonus_credits,
+        is_active: editingPkg.is_active,
+      };
+
+      if (isNew) {
+        const { error } = await supabase.from("credit_packages").insert(payload);
+        if (error) throw error;
+        toast.success("Paket berhasil ditambahkan!");
+      } else if ("id" in editingPkg && editingPkg.id) {
+        const { error } = await supabase
+          .from("credit_packages")
+          .update(payload)
+          .eq("id", editingPkg.id);
+        if (error) throw error;
+        toast.success("Paket berhasil diupdate!");
+      }
+
+      setDialogOpen(false);
+      fetchPackages();
+    } catch {
+      toast.error("Gagal menyimpan paket");
+    }
+    setSaving(false);
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Yakin ingin menghapus paket ini? Aksi ini tidak bisa dibatalkan.")) return;
 
     const { error } = await supabase.from("credit_packages").delete().eq("id", id);
     if (error) {
@@ -93,37 +124,33 @@ export default function AdminPricingPage() {
       return;
     }
     setPackages((prev) => prev.filter((p) => p.id !== id));
-    toast.success("Paket dihapus");
+    toast.success("Paket berhasil dihapus");
   }
 
-  function addNewPackage() {
-    setPackages([
-      ...packages,
-      {
-        id: `new-${Date.now()}`,
-        name: "",
-        credits: 0,
-        price_idr: 0,
-        bonus_credits: 0,
-        is_active: true,
-        created_at: new Date().toISOString(),
-      },
-    ]);
-  }
+  async function toggleActive(pkg: CreditPackage) {
+    const newActive = !pkg.is_active;
+    const { error } = await supabase
+      .from("credit_packages")
+      .update({ is_active: newActive })
+      .eq("id", pkg.id);
 
-  function updatePackage(id: string, field: keyof CreditPackage, value: string | number | boolean) {
+    if (error) {
+      toast.error("Gagal update status");
+      return;
+    }
     setPackages((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, [field]: value } : p))
+      prev.map((p) => (p.id === pkg.id ? { ...p, is_active: newActive } : p))
     );
+    toast.success(newActive ? "Paket diaktifkan" : "Paket dinonaktifkan");
   }
 
   if (loading) {
     return (
       <div className="space-y-6">
         <div className="h-9 w-48 skeleton-shimmer rounded-lg" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-64 skeleton-shimmer rounded-xl" />
+            <div key={i} className="h-20 skeleton-shimmer rounded-xl" />
           ))}
         </div>
       </div>
@@ -135,121 +162,235 @@ export default function AdminPricingPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Paket Kredit</h1>
-          <p className="text-muted-foreground mt-1">Kelola paket harga kredit</p>
+          <p className="text-muted-foreground mt-1">
+            {packages.length} paket · {packages.filter((p) => p.is_active).length} aktif
+          </p>
         </div>
-        <Button onClick={addNewPackage} className="gap-2 font-semibold">
+        <Button onClick={openCreate} className="gap-2 font-semibold">
           <Plus className="h-4 w-4" />
           Tambah Paket
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {packages.map((pkg, i) => (
-          <motion.div
-            key={pkg.id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
-          >
-            <Card className={`border-0 shadow-sm ${!pkg.is_active ? "opacity-60" : ""}`}>
-              <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-sm font-bold">
-                    {pkg.name || "Paket Baru"}
-                  </CardTitle>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={pkg.is_active ? "default" : "secondary"} className="text-[10px]">
-                    {pkg.is_active ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">Nama Paket</Label>
-                    <Input
-                      value={pkg.name}
-                      onChange={(e) => updatePackage(pkg.id, "name", e.target.value)}
-                      placeholder="Starter"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">Kredit</Label>
-                    <Input
-                      type="number"
-                      value={pkg.credits}
-                      onChange={(e) => updatePackage(pkg.id, "credits", parseInt(e.target.value) || 0)}
-                    />
-                  </div>
-                </div>
+      {/* Package Table */}
+      <Card className="border-0 shadow-sm overflow-hidden">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/30">
+                  <th className="text-left font-semibold p-4">Paket</th>
+                  <th className="text-center font-semibold p-4">Kredit</th>
+                  <th className="text-center font-semibold p-4">Bonus</th>
+                  <th className="text-center font-semibold p-4">Harga</th>
+                  <th className="text-center font-semibold p-4">Per Kredit</th>
+                  <th className="text-center font-semibold p-4">Status</th>
+                  <th className="text-right font-semibold p-4">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {packages.map((pkg, i) => (
+                  <motion.tr
+                    key={pkg.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: i * 0.05 }}
+                    className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${
+                      !pkg.is_active ? "opacity-50" : ""
+                    }`}
+                  >
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <CreditCard className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-semibold">{pkg.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Total: {pkg.credits + pkg.bonus_credits} kredit
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-4 text-center font-medium">{pkg.credits}</td>
+                    <td className="p-4 text-center">
+                      {pkg.bonus_credits > 0 ? (
+                        <Badge variant="secondary" className="text-xs font-bold text-primary">
+                          +{pkg.bonus_credits}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="p-4 text-center font-bold">
+                      Rp {pkg.price_idr.toLocaleString("id-ID")}
+                    </td>
+                    <td className="p-4 text-center text-muted-foreground text-xs">
+                      Rp {Math.round(pkg.price_idr / (pkg.credits + pkg.bonus_credits)).toLocaleString("id-ID")}
+                    </td>
+                    <td className="p-4 text-center">
+                      <Badge
+                        variant={pkg.is_active ? "default" : "secondary"}
+                        className="cursor-pointer text-xs"
+                        onClick={() => toggleActive(pkg)}
+                      >
+                        {pkg.is_active ? "Aktif" : "Nonaktif"}
+                      </Badge>
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={() => toggleActive(pkg)}
+                          title={pkg.is_active ? "Nonaktifkan" : "Aktifkan"}
+                        >
+                          {pkg.is_active ? (
+                            <ToggleRight className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <ToggleLeft className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          onClick={() => openEdit(pkg)}
+                          title="Edit paket"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleDelete(pkg.id)}
+                          title="Hapus paket"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">Harga (Rp)</Label>
-                    <Input
-                      type="number"
-                      value={pkg.price_idr}
-                      onChange={(e) => updatePackage(pkg.id, "price_idr", parseInt(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">Bonus Kredit</Label>
-                    <Input
-                      type="number"
-                      value={pkg.bonus_credits}
-                      onChange={(e) => updatePackage(pkg.id, "bonus_credits", parseInt(e.target.value) || 0)}
-                    />
-                  </div>
-                </div>
+      {packages.length === 0 && (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="text-center py-16">
+            <Coins className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
+            <p className="font-semibold">Belum ada paket kredit</p>
+            <p className="text-sm text-muted-foreground mt-1 mb-4">Tambah paket pertama untuk mulai jualan</p>
+            <Button onClick={openCreate} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Tambah Paket
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
-                {pkg.credits > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Harga per kredit: Rp {Math.round(pkg.price_idr / (pkg.credits + pkg.bonus_credits)).toLocaleString("id-ID")}
+      {/* Create/Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-primary" />
+              {isNew ? "Tambah Paket Baru" : `Edit: ${editingPkg?.name || ""}`}
+            </DialogTitle>
+          </DialogHeader>
+
+          {editingPkg && (
+            <div className="space-y-5 mt-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Nama Paket *</Label>
+                <Input
+                  value={editingPkg.name}
+                  onChange={(e) => setEditingPkg({ ...editingPkg, name: e.target.value })}
+                  placeholder="Contoh: Starter, Basic, Pro"
+                  className="h-11"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Jumlah Kredit *</Label>
+                  <Input
+                    type="number"
+                    value={editingPkg.credits}
+                    onChange={(e) =>
+                      setEditingPkg({ ...editingPkg, credits: parseInt(e.target.value) || 0 })
+                    }
+                    placeholder="10"
+                    className="h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Bonus Kredit</Label>
+                  <Input
+                    type="number"
+                    value={editingPkg.bonus_credits}
+                    onChange={(e) =>
+                      setEditingPkg({ ...editingPkg, bonus_credits: parseInt(e.target.value) || 0 })
+                    }
+                    placeholder="0"
+                    className="h-11"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Harga (Rupiah) *</Label>
+                <Input
+                  type="number"
+                  value={editingPkg.price_idr}
+                  onChange={(e) =>
+                    setEditingPkg({ ...editingPkg, price_idr: parseInt(e.target.value) || 0 })
+                  }
+                  placeholder="15000"
+                  className="h-11"
+                />
+                {editingPkg.credits > 0 && editingPkg.price_idr > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    = Rp {Math.round(editingPkg.price_idr / (editingPkg.credits + editingPkg.bonus_credits)).toLocaleString("id-ID")} per kredit
                   </p>
                 )}
+              </div>
 
-                <div className="flex items-center justify-between pt-2 border-t">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={pkg.is_active}
-                      onChange={(e) => updatePackage(pkg.id, "is_active", e.target.checked)}
-                      className="rounded border-border"
-                    />
-                    <span className="text-xs font-medium">Aktif</span>
-                  </label>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                <input
+                  type="checkbox"
+                  checked={editingPkg.is_active}
+                  onChange={(e) => setEditingPkg({ ...editingPkg, is_active: e.target.checked })}
+                  className="rounded border-border h-4 w-4"
+                  id="pkg-active"
+                />
+                <Label htmlFor="pkg-active" className="text-sm font-medium cursor-pointer">
+                  Paket aktif (tampil di halaman pricing)
+                </Label>
+              </div>
 
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive h-8"
-                      onClick={() => handleDelete(pkg.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="gap-1.5 h-8 font-medium"
-                      onClick={() => handleSave(pkg)}
-                      disabled={saving === pkg.id}
-                    >
-                      {saving === pkg.id ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Save className="h-3.5 w-3.5" />
-                      )}
-                      Simpan
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                  Batal
+                </Button>
+                <Button onClick={handleSave} disabled={saving} className="gap-2 font-semibold min-w-[120px]">
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  {isNew ? "Tambah" : "Simpan"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

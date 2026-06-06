@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   Menu,
   X,
+  Cpu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -24,6 +25,7 @@ const navItems = [
   { href: "/admin/landing", label: "Landing Page", icon: Globe },
   { href: "/admin/pricing", label: "Paket Kredit", icon: CreditCard },
   { href: "/admin/blog", label: "Blog", icon: FileText },
+  { href: "/admin/llm", label: "LLM Usage", icon: Cpu },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/tasks", label: "Tasks", icon: FileText },
 ];
