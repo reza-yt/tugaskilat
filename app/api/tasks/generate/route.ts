@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { generateTaskStream, type TaskInput, type TaskType, type WordCountOption } from "@/lib/ai/gemini";
 import { z } from "zod";
+import { checkRateLimit, getRateLimitHeaders } from "@/lib/security/rate-limit";
+import { stripHtml } from "@/lib/security/sanitize";
 
 const generateSchema = z.object({
   taskType: z.enum([
@@ -34,6 +36,15 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limiting
+    const rateResult = await checkRateLimit(user.id, "generate");
+    if (!rateResult.allowed) {
+      return NextResponse.json(
+        { error: "Terlalu banyak request. Coba lagi dalam beberapa saat." },
+        { status: 429, headers: getRateLimitHeaders(rateResult) }
+      );
     }
 
     // 2. Validate input
@@ -132,12 +143,34 @@ async function generateAndSave(
   input: TaskInput
 ) {
   try {
+    const startTime = Date.now();
     const result = generateTaskStream(input);
     const response = await result;
     const fullText = await response.text;
+    const duration = Date.now() - startTime;
 
     // Count words
     const wordCount = fullText.split(/\s+/).filter(Boolean).length;
+
+    // Estimate tokens (rough: 1 token ≈ 4 chars)
+    const estimatedOutputTokens = Math.ceil(fullText.length / 4);
+    const estimatedInputTokens = Math.ceil(
+      (input.title.length + (input.instructions?.length || 0) + 500) / 4
+    );
+    // Gemini 2.5 Flash pricing: ~$0.15/1M input, ~$0.60/1M output
+    const costUsd =
+      (estimatedInputTokens * 0.00000015) + (estimatedOutputTokens * 0.0000006);
+
+    // Log LLM usage
+    await serviceClient.from("llm_usage").insert({
+      task_id: taskId,
+      model: "gemini-2.5-flash",
+      input_tokens: estimatedInputTokens,
+      output_tokens: estimatedOutputTokens,
+      total_tokens: estimatedInputTokens + estimatedOutputTokens,
+      cost_usd: costUsd,
+      duration_ms: duration,
+    });
 
     // Update task with result
     await serviceClient

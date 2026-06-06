@@ -23,6 +23,7 @@ const navItems = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/landing", label: "Landing Page", icon: Globe },
   { href: "/admin/pricing", label: "Paket Kredit", icon: CreditCard },
+  { href: "/admin/blog", label: "Blog", icon: FileText },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/tasks", label: "Tasks", icon: FileText },
 ];

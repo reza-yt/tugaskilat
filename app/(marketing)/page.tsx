@@ -31,6 +31,7 @@ import {
   X,
 } from "lucide-react";
 import { FadeIn, FadeInWhenVisible, StaggerContainer, StaggerItem } from "@/components/ui/motion";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { motion } from "framer-motion";
 import { useState } from "react";
 
@@ -118,11 +119,15 @@ export default function LandingPage() {
             <a href="#harga" className="text-muted-foreground hover:text-foreground transition-colors">
               Harga
             </a>
+            <Link href="/blog" className="text-muted-foreground hover:text-foreground transition-colors">
+              Blog
+            </Link>
             <a href="#faq" className="text-muted-foreground hover:text-foreground transition-colors">
               FAQ
             </a>
           </nav>
           <div className="hidden md:flex items-center gap-3">
+            <ThemeToggle />
             <Link href="/login">
               <Button variant="ghost" size="sm" className="font-medium">
                 Masuk
@@ -456,7 +461,7 @@ export default function LandingPage() {
             <span className="font-bold">TugasKilat</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            &copy; 2025 TugasKilat. All rights reserved.
+            &copy; 2026 TugasKilat. All rights reserved.
           </p>
           <div className="flex gap-6 text-sm text-muted-foreground">
             <a href="#" className="hover:text-foreground transition-colors">Privasi</a>
