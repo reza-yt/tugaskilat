@@ -7,7 +7,7 @@ import { AdminSidebar } from "@/components/admin/sidebar";
 import { Loader2 } from "lucide-react";
 
 const ADMIN_EMAILS = [
-  "admin@tugaskilat.web.id",
+  "dracprem@gmail.com",
   // Tambahkan email admin di sini
 ];
 
